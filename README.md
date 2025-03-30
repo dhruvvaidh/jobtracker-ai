@@ -1,2 +1,2 @@
-# jobtracker-ai
-Job tracker AI Application
+# Jobtracker-AI
+Job Application tracker

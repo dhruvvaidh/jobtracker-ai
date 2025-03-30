@@ -5,7 +5,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime. base import MIMEBase
 from email import encoders
 from gmail_auth import create_service
-def init_gmail_service(client_file, api_name='gmail', api_version='vl', scopes=['https://mail.google.com/']):
+def init_gmail_service(client_file, api_name='gmail', api_version='v1', scopes=['https://mail.google.com/']):
     return create_service(client_file, api_name, api_version, scopes)
 # All the emails sent by gmail are in a data structure called payload
 # Payload contains the header, body text and attachments
@@ -31,7 +31,7 @@ def get_email_messages (service, user_id='me', label_ids=None, folder_name='INBO
     messages = []
     next_page_token = None
     if folder_name:
-        label_results = service.users().labels ().list(userId=user_id).execute()
+        label_results = service.users().labels().list(userId=user_id).execute()
         labels = label_results.get('labels', [])
         folder_label_id = next((label['id'] for label in labels if label['name'].lower() == folder_name.lower()), None)
         if folder_label_id:
@@ -43,25 +43,25 @@ def get_email_messages (service, user_id='me', label_ids=None, folder_name='INBO
             raise ValueError(f"Folder {folder_name} not found.")
         
     while True:
-        result = service.users().messages.list(
+        result = service.users().messages().list(
             userId = user_id,
             labelIds = label_ids,
             maxResults = min(500,max_results - len(messages)) if max_results else 500,
             pageToken = next_page_token
         ).execute()
 
-        messages.extend(result.get('message',[]))
+        messages.extend(result.get('messages',[]))
 
         next_page_token = result.get('nextPageToken')
 
         if not next_page_token or (max_results and len(messages) >=max_results):
             break
 
-        return messages[:max_results] if max_results else messages
+    return messages[:max_results] if max_results else messages
     
 
 def get_email_message_details(service, msg_id):
-    message = service.users(). messages().get(userId='me', id=msg_id, format='full').execute()
+    message = service.users().messages().get(userId='me', id=msg_id, format='full').execute()
     payload = message['payload']
     headers = payload.get('headers', [])
     subject = next((header ['value'] for header in headers if header ['name'].lower() == 'subject'), None)

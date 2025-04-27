@@ -119,7 +119,7 @@ if __name__ == "__main__":
     print(f"Number of Job Application emails: {len(data)}")
 
     # Convert list of application info dicts into a pandas DataFrame
-    filtered = [d for d in data if d not in (None,'None')]
+    filtered = [d for d in data if d is not None]
     df = pd.DataFrame(filtered)
     df.to_csv('job_applications.csv', index=False)
     print(df)

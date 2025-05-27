@@ -4,6 +4,7 @@ import re
 import json
 import csv
 import pandas as pd
+from sqlalchemy import create_engine
 from typing import Optional, Dict, Any
 from dotenv import load_dotenv
 
@@ -13,6 +14,10 @@ from tqdm import tqdm
 
 load_dotenv()
 os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
+
+# Database setup for SQL storage
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///jobtracker.db")
+engine = create_engine(DATABASE_URL)
 
 def get_emails(messages):
     emails = []
@@ -86,7 +91,7 @@ def extract_emails(emails):
     ])
 
     llm = ChatOpenAI(
-        model_name="gpt-4o",
+        model_name="gpt-4o-mini",
         temperature=0.2
     )
     data = []
@@ -110,7 +115,7 @@ if __name__ == "__main__":
     service = init_gmail_service(client_file)
 
     #Downloading Emails
-    emails = download_emails(service,3)
+    emails = download_emails(service,2)
     print(len(emails))
 
     # Extracting Job Application Emails
@@ -121,5 +126,9 @@ if __name__ == "__main__":
     # Convert list of application info dicts into a pandas DataFrame
     filtered = [d for d in data if d is not None]
     df = pd.DataFrame(filtered)
+    df.insert(0, 'job_id', [f"Job_{i:02d}" for i in range(1, len(df) + 1)])
+    # make it the index so lookups naturally key off job_id
+    df.set_index('job_id', inplace=True)
     df.to_csv('job_applications.csv', index=False)
+    df.to_sql('job_applications', con=engine, if_exists='append', index=False)
     print(df)

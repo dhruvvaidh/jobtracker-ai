@@ -31,7 +31,6 @@ def download_emails(service,days:int = 1):
 
     return emails
 
-
 def extract_application_info(raw_response: str) -> Optional[Dict[str, Any]]:
     """
     Given the LLM's raw response, return a Python dict if it contains JSON,
@@ -56,7 +55,6 @@ def extract_application_info(raw_response: str) -> Optional[Dict[str, Any]]:
             except json.JSONDecodeError:
                 pass
         raise ValueError(f"Could not parse JSON from response: {raw_response!r}")
-
 
 def extract_emails(emails):
     # system + human templates
@@ -95,13 +93,11 @@ def extract_emails(emails):
     for email in tqdm(emails):
         prompt_value = template.format_prompt(email_body=email)
         messages     = prompt_value.to_messages()
-        response     = llm(messages=messages)
+        response     = llm.invoke(input=messages)
         
         # Clean & parse the LLM's output
         parsed = extract_application_info(response.content)
         data.append(parsed)
-        #print(parsed)         # dict or None
-        #print(type(parsed))   # <class 'dict'> or <class 'NoneType'>
 
     return data
 
@@ -112,7 +108,6 @@ def normalize_to_date(val):
     """
     if not val:
         return None
-    # Try pandas’ parser first (very forgiving), fallback to datetime.fromisoformat
     try:
         ts = pd.to_datetime(val, errors="raise")
         return ts.date()

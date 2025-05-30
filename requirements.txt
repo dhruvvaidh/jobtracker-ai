@@ -1,5 +1,9 @@
-fastapi 
+fastapi
 uvicorn
+python-jose
+google-auth
+python-dotenv
+sqlalchemy
 langchain-openai
 langchain
 google-api-python-client

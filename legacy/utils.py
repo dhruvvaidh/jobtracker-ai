@@ -8,7 +8,6 @@ from langchain_openai import ChatOpenAI
 from tqdm import tqdm
 from typing import Optional, Dict, Any
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, text
 
 load_dotenv()
 
@@ -66,7 +65,7 @@ def extract_emails(emails):
       2. “company_name”  
       3. “job_title”  
       4. “application_status” (Applied, Interview, Offer, Rejected)  
-      5. "date_rejected" (None if not present)(None if the email is not for Rejected)(Date of receiving the rejection email)
+      5. "date_rejected" (None if not present)(None if the email is not for Rejected)
       6. "interview_date" (None if not present)(Date of receiving the interview email)(None if the email is not for an Interview)
       7. "offer_date" (None if not present)(Date of receiving the offer email)(None if the email is not for an Offer)
 
@@ -118,24 +117,3 @@ def normalize_to_date(val):
             return dt.date()
         except Exception:
             return None
-        
-def initialize_db(DATABASE_URL):
-    # Database setup for SQL storage
-    engine = create_engine(DATABASE_URL)
-
-    # Ensure the job_applications table exists with job_id as primary key
-    with engine.begin() as conn:
-        conn.execute(text("""
-        CREATE TABLE IF NOT EXISTS job_applications (
-            job_id TEXT PRIMARY KEY,
-            date_applied DATE,
-            company_name TEXT,
-            job_title TEXT,
-            application_status TEXT,
-            date_rejected DATE,
-            interview_date DATE,
-            offer_date DATE
-        )
-        """))
-
-    return engine

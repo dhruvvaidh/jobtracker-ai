@@ -22,7 +22,7 @@ export async function googleAuth(idToken: string) {
       "Content-Type": "application/json",
     },
     credentials: "include", // Important: allow cookies from backend
-    body: JSON.stringify({ id_token: idToken }),
+    body: JSON.stringify({ token: idToken }),
   });
 
   if (!res.ok) {
@@ -65,4 +65,16 @@ export async function logout() {
     credentials: "include",
   });
   // Remove any client‑side state as needed
+}
+
+export async function isAuthenticated(): Promise<boolean> {
+  try {
+    const res = await fetch(`${BASE_URL}/auth/verify`, {
+      method: "GET",
+      credentials: "include",
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }

@@ -1,39 +1,41 @@
-// src/AppRouter.tsx
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import Login from "./pages/Login";
-import Dashboard from "./pages/Dashboard";
-
-/**
- * A very simple “isAuthenticated” placeholder.
- * In reality, you’ll check for a valid JWT cookie.
- */
-function isAuthenticated(): boolean {
-  // For example, you might check document.cookie for “jwt=...”
-  return document.cookie.includes("token="); 
-}
+import Login from "@pages/Login";
+import Dashboard from "@pages/Dashboard";
+import { isAuthenticated } from "@services/api"; // changed to async
 
 export default function AppRouter() {
+  const [authChecked, setAuthChecked] = useState(false);
+  const [loggedIn, setLoggedIn] = useState(false);
+
+  useEffect(() => {
+    // On mount, immediately check if the user is logged in
+    isAuthenticated().then((ok) => {
+      setLoggedIn(ok);
+      setAuthChecked(true);
+    });
+  }, []);
+
+  if (!authChecked) {
+    // Still waiting for the /auth/verify call to finish
+    return <div>Loading…</div>;
+  }
+
   return (
     <BrowserRouter>
       <Routes>
         <Route
           path="/"
-          element={
-            isAuthenticated() ? <Navigate to="/dashboard" /> : <Login />
-          }
+          element={loggedIn ? <Navigate to="/dashboard" /> : <Login />}
         />
         <Route
           path="/login"
-          element={isAuthenticated() ? <Navigate to="/dashboard" /> : <Login />}
+          element={loggedIn ? <Navigate to="/dashboard" /> : <Login />}
         />
         <Route
           path="/dashboard"
-          element={
-            isAuthenticated() ? <Dashboard /> : <Navigate to="/login" />
-          }
+          element={loggedIn ? <Dashboard /> : <Navigate to="/login" />}
         />
-        {/* Fallback */}
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </BrowserRouter>

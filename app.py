@@ -113,3 +113,15 @@ async def classify_emails():
     from classify import run_classification  # assume you have a function like this
     run_classification()
     return {"status": "classification complete"}
+
+#7. 
+@app.get("/auth/verify")
+async def verify_login(request: Request):
+    token = request.cookies.get("token")
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    try:
+        payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    return {"user_id": payload["user_id"], "email": payload["email"]}

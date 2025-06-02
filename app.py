@@ -1,5 +1,3 @@
-# app.py (excerpt)
-
 from fastapi import FastAPI, Depends, HTTPException, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -8,11 +6,13 @@ from google.auth.transport import requests as google_requests
 import jwt
 import os
 from typing import Dict, List
+import google.oauth2
 
 # Replace these with your own values
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "supersecret")
 JWT_ALGORITHM = "HS256"
+JWT_EXPIRE_SECONDS = 3600
 
 app = FastAPI()
 
@@ -29,52 +29,42 @@ app.add_middleware(
 )
 
 # 2. Schemas for request bodies
+# In app.py
 class GoogleToken(BaseModel):
     token: str
 
-# 3. POST /auth/google endpoint
+# 3. Google Authentication
 @app.post("/auth/google")
-async def auth_google(data: GoogleToken, response: Response):
-    """
-    1. Verify the ID token with Google.
-    2. Generate a JWT for your own app.
-    3. Set it as an HttpOnly cookie.
-    4. Return some JSON if desired (e.g. { "status": "ok" }).
-    """
-    try:
-        # Verify the ID token against Google
-        idinfo = id_token.verify_oauth2_token(
-            data.token, google_requests.Request(), GOOGLE_CLIENT_ID
-        )
-    except ValueError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Google token")
-
-    # Example: idinfo contains fields like 'email', 'email_verified', 'sub' (Google user ID), etc.
-    if not idinfo.get("email_verified"):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Email not verified by Google")
-
-    user_email = idinfo["email"]
-    user_id = idinfo["sub"]
-
-    # TODO: (Optional) Create or lookup this user in your own DB.
-    # For now, just embed email and sub in the JWT payload.
-    payload = {
-        "sub": user_id,
-        "email": user_email,
-    }
-    token = jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
-
-    # Set as HttpOnly cookie
-    response.set_cookie(
-        key="access_token",
-        value=token,
-        httponly=True,
-        samesite="lax",      # prevents CSRF on cross-site requests
-        secure=False,        # set True if you serve over HTTPS (in production)
-        max_age=60 * 60 * 24  # e.g. 1 day
+async def auth_google(payload: GoogleToken, response: Response):
+    # 1) Verify the Google ID token
+    id_info = google.oauth2.id_token.verify_oauth2_token(
+        payload.token,
+        google.auth.transport.requests.Request(),
+        GOOGLE_CLIENT_ID
     )
 
-    return {"status": "success"}
+    # 2) Build your own JWT
+    import time
+    jwt_payload = {
+        "user_id": id_info["sub"],
+        "email": id_info["email"],
+        "exp": time.time() + JWT_EXPIRE_SECONDS
+    }
+    my_jwt = jwt.encode(jwt_payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
+
+    # 3) Set the HttpOnly cookie “token”
+    response.set_cookie(
+        key="token",
+        value=my_jwt,
+        httponly=True,
+        secure=False,    # true in prod
+        samesite="lax",  # or "none" in prod with secure=True
+        max_age=JWT_EXPIRE_SECONDS,
+        path="/",
+    )
+
+    # 4) Return success
+    return {"email": id_info["email"]}
 
 
 # 4. Utility function to get current user from cookie (for protected routes)
@@ -114,14 +104,14 @@ async def classify_emails():
     run_classification()
     return {"status": "classification complete"}
 
-#7. 
+#7. Verifying the authentication
 @app.get("/auth/verify")
 async def verify_login(request: Request):
     token = request.cookies.get("token")
     if not token:
-        raise HTTPException(status_code=401, detail="Not authenticated")
+        raise HTTPException(status_code=401, detail="Not authenticated.")
     try:
         payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
     except jwt.PyJWTError:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
+        raise HTTPException(status_code=401, detail="Invalid or expired token.")
     return {"user_id": payload["user_id"], "email": payload["email"]}

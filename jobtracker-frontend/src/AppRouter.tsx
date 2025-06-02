@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import Login from "@pages/Login";
-import Dashboard from "@pages/Dashboard";
-import { isAuthenticated } from "@services/api"; // changed to async
+import Login from "./pages/Login";
+import Dashboard from "./pages/Dashboard";
+import { isAuthenticated } from "./services/api"; // changed to async
 
 export default function AppRouter() {
   const [authChecked, setAuthChecked] = useState(false);
@@ -17,8 +17,12 @@ export default function AppRouter() {
   }, []);
 
   if (!authChecked) {
-    // Still waiting for the /auth/verify call to finish
-    return <div>Loading…</div>;
+    // Still waiting for /auth/verify
+    return (
+      <div style={{ textAlign: "center", marginTop: "4rem" }}>
+        Checking authentication…
+      </div>
+    );
   }
 
   return (

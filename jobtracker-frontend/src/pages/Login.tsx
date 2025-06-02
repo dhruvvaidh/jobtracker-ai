@@ -3,7 +3,8 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { GoogleLogin} from "@react-oauth/google";
 import type {CredentialResponse} from "@react-oauth/google"
-import { googleAuth } from "@services/api";
+import { googleAuth } from "../services/api";
+import { isAuthenticated } from "../services/api";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -27,12 +28,18 @@ export default function Login() {
 
     googleAuth(idToken)
       .then(() => {
-        // The backend has set an HttpOnly "token" cookie.
-        // Now navigate to /dashboard; AppRouter will call /auth/verify under the hood.
-        navigate("/dashboard");
+        // After Google login succeeded, re‑verify with the server:
+        return isAuthenticated();
+      })
+      .then((ok) => {
+        if (ok) {
+          navigate("/dashboard");
+        } else {
+          setError("Could not verify login. Please try again.");
+        }
       })
       .catch((e) => {
-        console.error("Google auth error:", e);
+        console.error("Login flow error:", e);
         setError("Login failed. Please check console for details.");
       })
       .finally(() => {

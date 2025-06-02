@@ -15,4 +15,4 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
   </React.StrictMode>
 );
 
-console.log(">>> import.meta.env:", import.meta.env);
+console.log(">>> import.meta.env.VITE_GOOGLE_CLIENT_ID:", import.meta.env.VITE_GOOGLE_CLIENT_ID);

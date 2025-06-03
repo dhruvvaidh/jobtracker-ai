@@ -52,15 +52,6 @@ export async function classifyAndRefresh(): Promise<ApplicationsByStatus> {
   return await fetchApplicationsByStatus();
 }
 
-export async function logout() {
-  // Optionally, if you implement a logout endpoint
-  await fetch(`${BASE_URL}/auth/logout`, {
-    method: "POST",
-    credentials: "include",
-  });
-  // Remove any client‑side state as needed
-}
-
 export async function isAuthenticated(): Promise<boolean> {
   try {
     const res = await fetch(`${BASE_URL}/auth/verify`, {
@@ -70,5 +61,15 @@ export async function isAuthenticated(): Promise<boolean> {
     return res.ok;
   } catch {
     return false;
+  }
+}
+
+export async function logout(): Promise<void> {
+  const res = await fetch(`${BASE_URL}/auth/logout`, {
+    method: "POST",
+    credentials: "include",
+  });
+  if (!res.ok) {
+    throw new Error(`Logout failed: ${res.statusText}`);
   }
 }

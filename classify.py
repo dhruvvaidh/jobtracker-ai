@@ -1,4 +1,5 @@
 from gmail_api import init_gmail_service
+from gmail_auth import build_user_gmail_service
 from utils import download_emails,extract_emails, normalize_to_date, initialize_db
 import os
 from tqdm import tqdm
@@ -8,14 +9,16 @@ import uuid
 
 load_dotenv()
 
-def classification():
+def classification(access_token:str):
     DATABASE_URL = os.getenv("DATABASE_URL")
     os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
     engine = initialize_db(DATABASE_URL)
 
     # Authentication
-    client_file = 'credentials.json'
-    service = init_gmail_service(client_file)
+    #client_file = 'credentials.json'
+    #service = init_gmail_service(client_file)
+
+    service = build_user_gmail_service(access_token)
 
     #Downloading Emails
     emails = download_emails(service,2)

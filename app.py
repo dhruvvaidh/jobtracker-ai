@@ -115,10 +115,39 @@ async def applications_by_status():
 
 # 6. Protected POST /classify
 @app.post("/classify", dependencies=[Depends(get_current_user)])
-async def classify_emails():
+async def classify_emails(request: Request):
     """
-    Runs classify.py, updates the database, then returns something (e.g. {"status":"updated"}).
+    Decode our session JWT, look up the user's Gmail access_token, and
+    pass that token into classification(...).
     """
+    # 1) Read the session cookie
+    token = request.cookies.get("token")
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated.")
+
+    # 2) Decode our own JWT to get google_user_id
+    try:
+        payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="Invalid or expired session token.")
+
+    google_user_id = payload.get("user_id")
+    if not google_user_id:
+        raise HTTPException(status_code=400, detail="Invalid session payload (no user_id).")
+
+    # 3) Look up the stored Gmail access token for that user
+    access_token = user_gmail_token_store.get(google_user_id)
+    if not access_token:
+        raise HTTPException(status_code=400, detail="No Gmail access token stored for this user.")
+
+    # 4) Call classification(...) passing in that access_token
     from classify import classification
-    classification()
+    classification(access_token)
+
     return {"status": "classification complete"}
+
+# 7. Logging out of the application
+@app.post("/auth/logout")
+async def logout(response: Response):
+    response.delete_cookie(key="token", path="/")
+    return {"message": "Logged out"}

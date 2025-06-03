@@ -44,13 +44,15 @@ export default function Dashboard() {
     }
   }
 
-  function handleLogout() {
-    logout().finally(() => {
-      // Clear client‑side cookie or user state if needed
-      document.cookie =
-        "token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+  async function handleLogout() {
+    try {
+      await logout();
+      // Once the server has deleted the HttpOnly cookie, we can redirect:
       navigate("/login");
-    });
+    } catch (e) {
+      console.error("Logout error:", e);
+      // Optionally show a user‐facing error message here
+    }
   }
 
   if (loading) {

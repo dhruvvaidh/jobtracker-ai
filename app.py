@@ -79,7 +79,7 @@ async def auth_google(payload: GoogleLoginPayload, response: Response):
 async def verify_login(request: Request):
     token = request.cookies.get("token")
     if not token:
-        raise HTTPException(status_code=401, detail="Not authenticated.")
+        raise HTTPException(status_code=401, detail="Not authenticated. Did not recieve the token")
     try:
         payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
     except jwt.PyJWTError:

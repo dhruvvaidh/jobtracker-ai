@@ -179,3 +179,4 @@ credentials.json
 token.json
 token files
 .env.local
+.db

@@ -18,6 +18,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     setLoading(true);
+    console.log("Fetching Applications by Status")
     fetchApplicationsByStatus()
       .then((res) => {
         setData(res);
@@ -34,7 +35,9 @@ export default function Dashboard() {
     setLoading(true);
     setError(null);
     try {
+      console.log("Classifying Emails")
       const refreshed = await classifyAndRefresh();
+      console.log("Recieved Classified Emails")
       setData(refreshed);
     } catch (e) {
       console.error(e);
@@ -47,6 +50,7 @@ export default function Dashboard() {
   async function handleLogout() {
     try {
       await logout();
+      console.log("Logging Out")
       // Once the server has deleted the HttpOnly cookie, we can redirect:
       navigate("/login");
     } catch (e) {

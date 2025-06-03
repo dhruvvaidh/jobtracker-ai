@@ -16,22 +16,27 @@ export default function Login() {
       "openid email profile https://www.googleapis.com/auth/gmail.readonly",
     onSuccess: (tokenResponse: TokenResponse) => {
       const accessToken = tokenResponse.access_token;
-
+      
       if (!accessToken) {
         setError("Failed to retrieve tokens from Google.");
         return;
       }
 
+      console.log("Tokens Recieved from Google");
+
       setError(null);
       setLoading(true);
 
+      console.log("Sending Tokens to backend");
       // Send both tokens to the backend
       googleAuth(accessToken)
         .then(() => {
+          console.log("Token Recieved by Dashboard");
           // On success, navigate to dashboard
           navigate("/dashboard");
         })
         .catch((e) => {
+          console.log("Token wasn't sent to Dashboard")
           console.error("Login flow error:", e);
           setError("Login failed. Check console for details.");
         })
@@ -86,7 +91,7 @@ export default function Login() {
         >
           {/* You can replace with your own Google icon */}
           <img
-            src="/google-icon.svg"
+            src="../assets/google.svg"
             alt="Google"
             width={24}
             height={24}

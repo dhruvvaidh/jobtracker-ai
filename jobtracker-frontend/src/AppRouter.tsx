@@ -10,14 +10,17 @@ export default function AppRouter() {
 
   useEffect(() => {
     // On mount, immediately check if the user is logged in
+    console.log("Starting Authentication")
     isAuthenticated().then((ok) => {
       setLoggedIn(ok);
+      console.log("Logged In")
       setAuthChecked(true);
     });
   }, []);
 
   if (!authChecked) {
     // Still waiting for /auth/verify
+    console.log("Checking Authentication")
     return (
       <div style={{ textAlign: "center", marginTop: "4rem" }}>
         Checking authentication…

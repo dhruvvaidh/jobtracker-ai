@@ -64,7 +64,7 @@ async def auth_google(payload: GoogleLoginPayload, response: Response):
         value=my_jwt,
         httponly=True,
         secure=False,  # True in production (HTTPS)
-        samesite="lax", # Or "none" + secure=True in prod
+        samesite="none", # Or "none" + secure=True in prod
         max_age=JWT_EXPIRE_SECONDS,
         path="/",
     )
@@ -79,6 +79,7 @@ async def auth_google(payload: GoogleLoginPayload, response: Response):
 async def verify_login(request: Request):
     token = request.cookies.get("token")
     if not token:
+        print("Token not recieved")
         raise HTTPException(status_code=401, detail="Not authenticated. Did not recieve the token")
     try:
         payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])

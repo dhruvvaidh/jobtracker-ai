@@ -1,60 +1,51 @@
 // src/pages/Login.tsx
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { GoogleLogin} from "@react-oauth/google";
-import type {CredentialResponse} from "@react-oauth/google"
+import { useGoogleLogin, type TokenResponse} from "@react-oauth/google";
 import { googleAuth } from "../services/api";
-import { isAuthenticated } from "../services/api";
 
 export default function Login() {
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState<boolean>(false);
+  const [loading, setLoading] = useState(false);
 
-  /**
-   * onSuccess is called when Google returns an ID token successfully.
-   * We then POST it to our backend (/auth/google). On 200, we navigate to /dashboard.
-   * The AppRouter will immediately trigger /auth/verify before rendering Dashboard.
-   */
-  function onSuccess(credentialResponse: CredentialResponse) {
-    const idToken = credentialResponse.credential;
-    if (!idToken) {
-      setError("No credential returned by Google.");
-      return;
-    }
+  // Configure useGoogleLogin to ask for Gmail scope as well
+  const login = useGoogleLogin({
+    flow: "implicit", // Implicit flow returns an access_token directly to the browser
+    scope:
+      "openid email profile https://www.googleapis.com/auth/gmail.readonly",
+    onSuccess: (tokenResponse: TokenResponse) => {
+      const accessToken = tokenResponse.access_token;
 
-    setError(null);
-    setLoading(true);
+      if (!accessToken) {
+        setError("Failed to retrieve tokens from Google.");
+        return;
+      }
 
-    googleAuth(idToken)
-      .then(() => {
-        // After Google login succeeded, re‑verify with the server:
-        return isAuthenticated();
-      })
-      .then((ok) => {
-        if (ok) {
+      setError(null);
+      setLoading(true);
+
+      // Send both tokens to the backend
+      googleAuth(accessToken)
+        .then(() => {
+          // On success, navigate to dashboard
           navigate("/dashboard");
-        } else {
-          setError("Could not verify login. Please try again.");
-        }
-      })
-      .catch((e) => {
-        console.error("Login flow error:", e);
-        setError("Login failed. Please check console for details.");
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  }
-
-  function onError() {
-    setError("Google sign‑in was unsuccessful. Try again.");
-  }
+        })
+        .catch((e) => {
+          console.error("Login flow error:", e);
+          setError("Login failed. Check console for details.");
+        })
+        .finally(() => setLoading(false));
+    },
+    onError: () => {
+      setError("Google sign‑in was unsuccessful. Try again.");
+    },
+  });
 
   return (
     <div
       style={{
-        maxWidth: "400px",
+        maxWidth: 400,
         margin: "4rem auto",
         padding: "2rem",
         border: "1px solid #ddd",
@@ -74,21 +65,35 @@ export default function Login() {
       )}
 
       {loading ? (
-        <button
-          disabled
-          style={{
-            padding: "0.5rem 1rem",
-            fontSize: "1rem",
-            backgroundColor: "#eee",
-            border: "1px solid #ccc",
-            borderRadius: "4px",
-            cursor: "not-allowed",
-          }}
-        >
+        <button disabled style={{ padding: "0.5rem 1rem" }}>
           Signing you in…
         </button>
       ) : (
-        <GoogleLogin onSuccess={onSuccess} onError={onError} />
+        <button
+          onClick={() => login()}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "0.5rem",
+            padding: "0.5rem 1rem",
+            fontSize: "1rem",
+            color: "#444",
+            backgroundColor: "#fff",
+            border: "1px solid #ddd",
+            borderRadius: "4px",
+            cursor: "pointer",
+          }}
+        >
+          {/* You can replace with your own Google icon */}
+          <img
+            src="/google-icon.svg"
+            alt="Google"
+            width={24}
+            height={24}
+            style={{ marginRight: "0.5rem" }}
+          />
+          Sign in with Google
+        </button>
       )}
     </div>
   );

@@ -11,29 +11,23 @@ function getCookie(name: string): string | null {
   return match ? decodeURIComponent(match[2]) : null;
 }
 
-export async function googleAuth(idToken: string) {
-  /**
-   * Send Google ID token to FastAPI.
-   * The backend should verify with Google, then set an HttpOnly cookie named "token".
-   */
+export async function googleAuth(
+  accessToken: string
+): Promise<any> {
   const res = await fetch(`${BASE_URL}/auth/google`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    credentials: "include", // Important: allow cookies from backend
-    body: JSON.stringify({ token: idToken }),
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({
+      access_token: accessToken,
+    }),
   });
-
   if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Google Auth failed: ${err}`);
+    const text = await res.text();
+    throw new Error(`Google Auth failed (status ${res.status}): ${text}`);
   }
-
-  // The backend will set an HttpOnly cookie; we can optionally parse user info.
-  return await res.json(); // e.g. { email: "...", name: "..." }
+  return res.json();
 }
-
 export async function fetchApplicationsByStatus(): Promise<ApplicationsByStatus> {
   const res = await fetch(`${BASE_URL}/applications_by_status`, {
     method: "GET",

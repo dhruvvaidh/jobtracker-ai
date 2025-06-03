@@ -179,4 +179,4 @@ credentials.json
 token.json
 token files
 .env.local
-.db
+jobtracker.db

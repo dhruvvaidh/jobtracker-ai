@@ -1,7 +1,7 @@
 // src/services/api.ts
 import type { ApplicationsByStatus } from "../types/status";
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://localhost:8000";
 
 function getCookie(name: string): string | null {
   // Simple helper to read a cookie by name

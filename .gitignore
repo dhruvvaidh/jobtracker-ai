@@ -180,3 +180,5 @@ token.json
 token files
 .env.local
 jobtracker.db
+localhost.pem
+localhost-key.pem

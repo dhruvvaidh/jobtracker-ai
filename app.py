@@ -17,7 +17,7 @@ app = FastAPI()
 
 # 1. CORS middleware (allow frontend origin with credentials)
 origins = [
-    "http://localhost:5173",
+    "https://localhost:5173",
 ]
 app.add_middleware(
     CORSMiddleware,
@@ -63,7 +63,7 @@ async def auth_google(payload: GoogleLoginPayload, response: Response):
         key="token",
         value=my_jwt,
         httponly=True,
-        secure=False,  # True in production (HTTPS)
+        secure=True,  # True in production (HTTPS)
         samesite="none", # Or "none" + secure=True in prod
         max_age=JWT_EXPIRE_SECONDS,
         path="/",
@@ -77,14 +77,18 @@ async def auth_google(payload: GoogleLoginPayload, response: Response):
 
 @app.get("/auth/verify")
 async def verify_login(request: Request):
+    print(">>> [VERIFY] Incoming cookies:", request.cookies)
     token = request.cookies.get("token")
     if not token:
-        print("Token not recieved")
+        print(">>> [VERIFY] No 'token' cookie found → returning 401")
         raise HTTPException(status_code=401, detail="Not authenticated. Did not recieve the token")
     try:
         payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
     except jwt.PyJWTError:
+        print(">>> [VERIFY] Found token but JWT.decode failed. (Expired or invalid.)")
         raise HTTPException(status_code=401, detail="Invalid or expired token.")
+    
+    print(f">>> [VERIFY] JWT payload:", payload)
     return {"user_id": payload["user_id"], "email": payload["email"]}
 
 # 4. Utility function to get current user from cookie (for protected routes)

@@ -9,12 +9,14 @@ import {
 import type { ApplicationsByStatus } from "../types/status";
 import StatusTile from "../components/StatusTile";
 import RefreshButton from "../components/RefreshButton";
+import { useAuth } from "../AuthContext";
 
 export default function Dashboard() {
   const [data, setData] = useState<ApplicationsByStatus | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
+  const { setLoggedIn } = useAuth();
 
   useEffect(() => {
     setLoading(true);
@@ -50,6 +52,7 @@ export default function Dashboard() {
   async function handleLogout() {
     try {
       await logout();
+      setLoggedIn(false);
       console.log("Logging Out")
       // Once the server has deleted the HttpOnly cookie, we can redirect:
       navigate("/login");

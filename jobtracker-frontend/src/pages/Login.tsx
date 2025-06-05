@@ -3,11 +3,14 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useGoogleLogin, type TokenResponse} from "@react-oauth/google";
 import { googleAuth } from "../services/api";
+import { isAuthenticated } from "../services/api";
+import { useAuth } from "../AuthContext";
 
 export default function Login() {
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const { setLoggedIn, setAuthChecked } = useAuth();
 
   // Configure useGoogleLogin to ask for Gmail scope as well
   const login = useGoogleLogin({
@@ -29,22 +32,45 @@ export default function Login() {
 
       console.log("Sending Tokens to backend");
       // Send both tokens to the backend
+      // googleAuth(accessToken)
+      //   .then(() => {
+      //     console.log("Token Recieved by Dashboard");
+      //     // On success, navigate to dashboard
+      //     navigate("/dashboard");
+      //   })
+      //   .catch((e) => {
+      //     console.log("Token wasn't sent to Dashboard")
+      //     console.error("Login flow error:", e);
+      //     setError("Login failed. Check console for details.");
+      //   })
+      //   .finally(() => setLoading(false));
       googleAuth(accessToken)
         .then(() => {
-          console.log("Token Recieved by Dashboard");
-          // On success, navigate to dashboard
-          navigate("/dashboard");
+          console.log("Tokens Sent to backend → Now calling verify()");
+          // Re‐check /auth/verify now that the cookie is set:
+          return isAuthenticated();
+        })
+        .then((ok) => {
+          console.log("Logged in? (after verify) →", ok);
+          if (ok) {
+            setLoggedIn(true);
+            setAuthChecked(true);
+            navigate("/dashboard");
+          } else {
+            setError("Unable to verify login.");
+          }
         })
         .catch((e) => {
-          console.log("Token wasn't sent to Dashboard")
           console.error("Login flow error:", e);
-          setError("Login failed. Check console for details.");
+          setError("Login failed. Please check console for details.");
         })
-        .finally(() => setLoading(false));
-    },
-    onError: () => {
-      setError("Google sign‑in was unsuccessful. Try again.");
-    },
+        .finally(() => {
+          setLoading(false);
+        });
+        },
+        onError: () => {
+          setError("Google sign‑in was unsuccessful. Try again.");
+        },
   });
 
   return (

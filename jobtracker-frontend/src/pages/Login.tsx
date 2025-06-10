@@ -5,12 +5,17 @@ import { useGoogleLogin, type TokenResponse} from "@react-oauth/google";
 import { googleAuth } from "../services/api";
 import { isAuthenticated } from "../services/api";
 import { useAuth } from "../AuthContext";
+import { useMsal} from "@azure/msal-react";
+import {type AuthError, InteractionStatus} from "@azure/msal-browser";
+import { loginRequest } from "../msalConfig";
+import { microsoftAuth } from "../services/api";
 
 export default function Login() {
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const { setLoggedIn, setAuthChecked } = useAuth();
+  const { instance, inProgress } = useMsal();
 
   // Configure useGoogleLogin to ask for Gmail scope as well
   const login = useGoogleLogin({
@@ -31,19 +36,6 @@ export default function Login() {
       setLoading(true);
 
       console.log("Sending Tokens to backend");
-      // Send both tokens to the backend
-      // googleAuth(accessToken)
-      //   .then(() => {
-      //     console.log("Token Recieved by Dashboard");
-      //     // On success, navigate to dashboard
-      //     navigate("/dashboard");
-      //   })
-      //   .catch((e) => {
-      //     console.log("Token wasn't sent to Dashboard")
-      //     console.error("Login flow error:", e);
-      //     setError("Login failed. Check console for details.");
-      //   })
-      //   .finally(() => setLoading(false));
       googleAuth(accessToken)
         .then(() => {
           console.log("Tokens Sent to backend → Now calling verify()");
@@ -73,6 +65,40 @@ export default function Login() {
         },
   });
 
+  async function loginMicrosoft() {
+    setError(null);
+    setLoading(true);
+    try {
+      // Open MS login popup
+      const loginResponse = await instance.loginPopup({
+        ...loginRequest,
+        prompt: "select_account",
+      });
+      // Acquire Graph API access token silently
+      const msalResult = await instance.acquireTokenSilent({
+        ...loginRequest,
+        account: loginResponse.account!,
+      });
+      const msAccessToken = msalResult.accessToken;
+      // Send to backend
+      await microsoftAuth(msAccessToken);
+      // Verify backend session
+      const ok = await isAuthenticated();
+      if (ok) {
+        setLoggedIn(true);
+        setAuthChecked(true);
+        navigate("/dashboard");
+      } else {
+        setError("Unable to verify login.");
+      }
+    } catch (e) {
+      console.error(e);
+      setError("Microsoft sign-in failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div
       style={{
@@ -100,31 +126,59 @@ export default function Login() {
           Signing you in…
         </button>
       ) : (
-        <button
-          onClick={() => login()}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "0.5rem",
-            padding: "0.5rem 1rem",
-            fontSize: "1rem",
-            color: "#444",
-            backgroundColor: "#fff",
-            border: "1px solid #ddd",
-            borderRadius: "4px",
-            cursor: "pointer",
-          }}
-        >
-          {/* You can replace with your own Google icon */}
-          <img
-            src="../assets/google.svg"
-            alt="Google"
-            width={24}
-            height={24}
-            style={{ marginRight: "0.5rem" }}
-          />
-          Sign in with Google
-        </button>
+        <>
+          <button
+            onClick={() => login()}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              padding: "0.5rem 1rem",
+              fontSize: "1rem",
+              color: "#444",
+              backgroundColor: "#fff",
+              border: "1px solid #ddd",
+              borderRadius: "4px",
+              cursor: "pointer",
+            }}
+          >
+            {/* You can replace with your own Google icon */}
+            <img
+              src="../assets/google.svg"
+              alt="Google"
+              width={24}
+              height={24}
+              style={{ marginRight: "0.5rem" }}
+            />
+            Sign in with Google
+          </button>
+          <button
+            onClick={loginMicrosoft}
+            disabled={loading || inProgress !== InteractionStatus.None}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              padding: "0.5rem 1rem",
+              fontSize: "1rem",
+              color: "#444",
+              backgroundColor: "#fff",
+              border: "1px solid #ddd",
+              borderRadius: "4px",
+              cursor: "pointer",
+              marginTop: "1rem",
+            }}
+          >
+            <img
+              src="../assets/microsoft.svg"
+              alt="Microsoft"
+              width={24}
+              height={24}
+              style={{ marginRight: "0.5rem" }}
+            />
+            Sign in with Microsoft
+          </button>
+        </>
       )}
     </div>
   );

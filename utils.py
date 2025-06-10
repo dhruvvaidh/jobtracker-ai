@@ -9,7 +9,10 @@ from tqdm import tqdm
 from typing import Optional, Dict, Any
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
-
+from microsoft import get_access_token, MS_GRAPH_BASE_URL, search_messages
+import os
+from load_dotenv import load_dotenv
+import httpx
 load_dotenv()
 
 
@@ -24,7 +27,7 @@ def get_emails(service,messages):
 
     return emails
 
-def download_emails(service,days:int = 1):
+def download_emails_google(service,days:int = 1):
 
     query = f'subject:"application" newer_than:{days}d -subject:"credit card"'
     filtered_emails = get_email_messages(service, query=query, max_results=None)
@@ -139,3 +142,38 @@ def initialize_db(DATABASE_URL):
         """))
 
     return engine
+
+def download_outlook_emails():
+    APPLICATION_ID = os.getenv('MICROSOFT_APPLICATION_ID')
+    CLIENT_SECRET = os.getenv('MICROSOFT_CLIENT_SECRET')
+    SCOPES = ['User.Read', 'Mail.ReadWrite']
+    endpoint = f'{MS_GRAPH_BASE_URL}/me/messages'
+    try:
+        access_token = get_access_token(APPLICATION_ID,CLIENT_SECRET,scopes=SCOPES)
+        headers = {
+                'Authorization': 'Bearer' + access_token
+            }
+
+        search_query='Job Applications OR Rejection OR Interview'
+        messages = search_messages(headers, search_query)
+        emails = []
+        for indx, mail_message in enumerate(messages):
+            print(f'Email {indx + 1}')
+            print('Subject:', mail_message['subject'])
+            print('From: ', mail_message['from']['emailAddress']['name'], f"({mail_message['from']['emailAddress']['address']})")
+            print('Received Date Time:', mail_message['receivedDateTime'])
+            print('Body Preview: ', mail_message['bodyPreview'])
+            print('-'*150)
+            emails.append(f"""
+            Subject: {mail_message['subject']}\n
+            From: {mail_message['from']['emailAddress']['name']}({mail_message['from']['emailAddress']['address']})\n
+            Received Date Time: {mail_message['receivedDateTime']} \n
+            Body: {mail_message['bodyPreview']}
+            """)
+
+    except httpx.HTTPStatusError as e:
+        print (f'HTTP Error: {e}')
+    except Exception as e:
+        print(f'Error: {e}')
+
+    return emails

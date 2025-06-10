@@ -3,9 +3,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import jwt
 import os
-from typing import Dict, List
+from typing import Dict, List, Literal, Optional
 import time
 import httpx
+from microsoft import MS_GRAPH_BASE_URL
 
 # Replace these with your own values
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
@@ -30,9 +31,15 @@ app.add_middleware(
 # 2. Schemas for request bodies
 # In app.py
 user_gmail_token_store: dict[str, str] = {}
+user_microsoft_token_store: dict[str,str] = {}
 
 class GoogleLoginPayload(BaseModel):
     access_token: str
+
+class ClassifyPayload(BaseModel):
+    provider: Literal["google", "microsoft", "both"] = "google"
+    # for microsoft (and in “both” if you want to re-use an inline token)
+    access_token: Optional[str] = None
 
 @app.post("/auth/google")
 async def auth_google(payload: GoogleLoginPayload, response: Response):
@@ -89,7 +96,7 @@ async def verify_login(request: Request):
         raise HTTPException(status_code=401, detail="Invalid or expired token.")
     
     print(f">>> [VERIFY] JWT payload:", payload)
-    return {"user_id": payload["user_id"], "email": payload["email"]}
+    return {"user_id": payload["user_id"], "email": payload["email"], "provider": payload.get("provider")}
 
 # 4. Utility function to get current user from cookie (for protected routes)
 from fastapi.security import HTTPBearer
@@ -120,39 +127,97 @@ async def applications_by_status():
 
 # 6. Protected POST /classify
 @app.post("/classify", dependencies=[Depends(get_current_user)])
-async def classify_emails(request: Request):
+async def classify_emails(classify_in:ClassifyPayload,request: Request):
     """
     Decode our session JWT, look up the user's Gmail access_token, and
     pass that token into classification(...).
     """
-    # 1) Read the session cookie
+     # 1) Read & decode our session JWT from the cookie
     token = request.cookies.get("token")
     if not token:
-        raise HTTPException(status_code=401, detail="Not authenticated.")
-
-    # 2) Decode our own JWT to get google_user_id
+        raise HTTPException(401, "Not authenticated.")
     try:
-        payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+        token_data = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
     except jwt.PyJWTError:
-        raise HTTPException(status_code=401, detail="Invalid or expired session token.")
+        raise HTTPException(401, "Invalid or expired session token.")
+    user_id = token_data["user_id"]
 
-    google_user_id = payload.get("user_id")
-    if not google_user_id:
-        raise HTTPException(status_code=400, detail="Invalid session payload (no user_id).")
+    # 2) Determine which provider(s) to use from the request body
+    provider = classify_in.provider.lower()
+    if provider == "google":
+        if classify_in.access_token:
+            user_gmail_token_store[user_id] = classify_in.access_token
+        access_token = user_gmail_token_store.get(user_id)
+        if not access_token:
+            raise HTTPException(400, "Google token not found; please re-login.")
+    elif provider == "microsoft":
+        # If the client sent an inline MS token (e.g. on first login), store it:
+        if classify_in.access_token:
+            user_microsoft_token_store[user_id] = classify_in.access_token
+        access_token = user_microsoft_token_store.get(user_id)
+        if not access_token:
+            raise HTTPException(400, "Microsoft token missing; please login with Microsoft.")
+    elif provider == "both":
+        # Ensure both tokens are present
+        g = user_gmail_token_store.get(user_id)
+        m = user_microsoft_token_store.get(user_id)
+        if not g or not m:
+            raise HTTPException(400, "Both tokens required; please login to both providers.")
+        access_token = None  # classification() will handle both internally
+    else:
+        raise HTTPException(400, f"Unknown provider '{provider}'.")
 
-    # 3) Look up the stored Gmail access token for that user
-    access_token = user_gmail_token_store.get(google_user_id)
-    if not access_token:
-        raise HTTPException(status_code=400, detail="No Gmail access token stored for this user.")
-
-    # 4) Call classification(...) passing in that access_token
+    # 3) Call your classification() logic
     from classify import classification
-    classification(access_token)
+    # If you pass `access_token=None` and provider="both", your classify()
+    # will fetch from both services.
+    classification(access_token, provider=provider)
 
-    return {"status": "classification complete"}
+    return {"status": "classification complete", "provider": provider}
 
 # 7. Logging out of the application
 @app.post("/auth/logout")
 async def logout(response: Response):
     response.delete_cookie(key="token", path="/")
     return {"message": "Logged out"}
+
+class MicrosoftLoginPayload(BaseModel):
+    access_token: str
+
+@app.post("/auth/microsoft")
+async def auth_microsoft(payload: MicrosoftLoginPayload, response: Response):
+    # 1) Validate the Microsoft access token via Graph /me
+    async with httpx.AsyncClient() as client:
+        me_resp = await client.get(
+            f"{MS_GRAPH_BASE_URL}/me",
+            headers={"Authorization": f"Bearer {payload.access_token}"}
+        )
+    if me_resp.status_code != 200:
+        raise HTTPException(status_code=400, detail="Invalid Microsoft access token.")
+    profile = me_resp.json()
+    ms_user_id = profile.get("id")
+    email = profile.get("mail") or profile.get("userPrincipalName")
+    if not ms_user_id or not email:
+        raise HTTPException(status_code=400, detail="Failed to retrieve Microsoft user info.")
+    
+    # 2) Issue a JWT cookie (same as Google flow)
+    jwt_payload = {
+        "user_id": ms_user_id,
+        "email": email,
+        "exp": time.time() + JWT_EXPIRE_SECONDS,
+    }
+    my_jwt = jwt.encode(jwt_payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
+    response.set_cookie(
+        key="token",
+        value=my_jwt,
+        httponly=True,
+        secure=True,
+        samesite="none",
+        max_age=JWT_EXPIRE_SECONDS,
+        path="/",
+    )
+
+    # 3) Store the raw MS token for later classification
+    user_microsoft_token_store[ms_user_id] = payload.access_token
+
+    return {"email": email}

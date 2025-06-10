@@ -28,6 +28,20 @@ export async function googleAuth(
   }
   return res.json();
 }
+
+export async function microsoftAuth(accessToken: string): Promise<any> {
+  const res = await fetch(`${BASE_URL}/auth/microsoft`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ access_token: accessToken }),
+  });
+  if (!res.ok) {
+    throw new Error(`Microsoft Auth failed (${res.status}): ${await res.text()}`);
+  }
+  return res.json();
+}
+
 export async function fetchApplicationsByStatus(): Promise<ApplicationsByStatus> {
   const res = await fetch(`${BASE_URL}/applications_by_status`, {
     method: "GET",
@@ -39,16 +53,27 @@ export async function fetchApplicationsByStatus(): Promise<ApplicationsByStatus>
   return (await res.json()) as ApplicationsByStatus;
 }
 
-export async function classifyAndRefresh(): Promise<ApplicationsByStatus> {
-  // 1. POST to /classify
-  const postRes = await fetch(`${BASE_URL}/classify`, {
+export type Provider = "google" | "microsoft" | "both";
+
+export async function classifyAndRefresh(
+  provider: Provider,
+  accessToken?: string
+): Promise<ApplicationsByStatus> {
+  const body: any = { provider };
+  if (accessToken) {
+    body.access_token = accessToken;
+  }
+
+  const res = await fetch(`${BASE_URL}/classify`, {
     method: "POST",
     credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
   });
-  if (!postRes.ok) {
-    throw new Error(`Classification failed: ${postRes.statusText}`);
+
+  if (!res.ok) {
+    throw new Error(`Classification failed: ${res.statusText}`);
   }
-  // 2. Refetch updated statuses
   return await fetchApplicationsByStatus();
 }
 

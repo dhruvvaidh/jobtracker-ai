@@ -1,6 +1,5 @@
-from gmail_api import init_gmail_service
 from gmail_auth import build_user_gmail_service
-from utils import download_emails,extract_emails, normalize_to_date, initialize_db
+from utils import download_emails_google, download_outlook_emails, extract_emails, normalize_to_date, initialize_db
 import os
 from tqdm import tqdm
 from sqlalchemy import text
@@ -9,20 +8,31 @@ import uuid
 
 load_dotenv()
 
-def classification(access_token:str):
+def classification(access_token: str, provider: str = "google"):
     DATABASE_URL = os.getenv("DATABASE_URL")
     os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
     engine = initialize_db(DATABASE_URL)
-
-    # Authentication
-    #client_file = 'credentials.json'
-    #service = init_gmail_service(client_file)
-
-    service = build_user_gmail_service(access_token)
-
-    #Downloading Emails
-    emails = download_emails(service,2)
-    print(len(emails))
+    emails: list[str] = []
+    if provider.lower() == "google":
+        print("Using Google provider")
+        service = build_user_gmail_service(access_token)
+        emails = download_emails_google(service, 2)
+        print(f"Downloaded {len(emails)} Gmail messages")
+    elif provider.lower() == "microsoft":
+        print("Using Microsoft provider")
+        emails = download_outlook_emails()
+        print(f"Downloaded {len(emails)} Outlook messages")
+    elif provider.lower() == "both":
+        print("Using both Google and Microsoft providers")
+        service = build_user_gmail_service(access_token)
+        gmail_msgs = download_emails_google(service, 2)
+        print(f"Downloaded {len(gmail_msgs)} Gmail messages")
+        outlook_msgs = download_outlook_emails()
+        print(f"Downloaded {len(outlook_msgs)} Outlook messages")
+        emails = gmail_msgs + outlook_msgs
+        print(f"Total combined messages: {len(emails)}")
+    else:
+        raise ValueError(f"Unknown provider: {provider}")
 
     # Extracting Job Application Emails
     data = extract_emails(emails)

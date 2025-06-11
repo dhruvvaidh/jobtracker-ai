@@ -7,7 +7,8 @@ import { AuthProvider } from "./AuthContext";
 
 // MSAL imports
 import { PublicClientApplication } from "@azure/msal-browser";
-import { MsalProvider } from "@azure/msal-react";
+import { MsalProvider, useMsal } from "@azure/msal-react";
+import { useEffect } from "react";
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID!;
 const MICROSOFT_CLIENT_ID = import.meta.env.VITE_MICROSOFT_CLIENT_ID!;
@@ -27,13 +28,36 @@ const msalConfig = {
 
 const msalInstance = new PublicClientApplication(msalConfig);
 
+// Handler to process redirect responses before rendering the app
+function MsalHandler({ children }: { children: React.ReactNode }) {
+  const { instance } = useMsal();
+  useEffect(() => {
+    (async () => {
+      try {
+        // Ensure the MSAL client is initialized before any other calls
+        await instance.initialize();
+        // Process the redirect response (if any)
+        const resp = await instance.handleRedirectPromise();
+        if (resp) {
+          console.log("MSAL redirect response", resp);
+        }
+      } catch (e) {
+        console.error("MSAL initialization or redirect error", e);
+      }
+    })();
+  }, [instance]);
+  return <>{children}</>;
+}
+
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
       <MsalProvider instance={msalInstance}>
-        <AuthProvider>
-          <AppRouter />
-        </AuthProvider>
+        <MsalHandler>
+          <AuthProvider>
+            <AppRouter />
+          </AuthProvider>
+        </MsalHandler>
       </MsalProvider>
     </GoogleOAuthProvider>
   </React.StrictMode>

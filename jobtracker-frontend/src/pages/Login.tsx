@@ -6,7 +6,7 @@ import { googleAuth } from "../services/api";
 import { isAuthenticated } from "../services/api";
 import { useAuth } from "../AuthContext";
 import { useMsal} from "@azure/msal-react";
-import {type AuthError, InteractionStatus} from "@azure/msal-browser";
+//import {type AuthError, InteractionStatus} from "@azure/msal-browser";
 import { loginRequest } from "../msalConfig";
 import { microsoftAuth } from "../services/api";
 
@@ -69,32 +69,15 @@ export default function Login() {
     setError(null);
     setLoading(true);
     try {
-      // Open MS login popup
-      const loginResponse = await instance.loginPopup({
-        ...loginRequest,
+      // Perform redirect-based login (hash will be handled in main.tsx)
+      await instance.loginRedirect({
+        scopes: loginRequest.scopes,
         prompt: "select_account",
       });
-      // Acquire Graph API access token silently
-      const msalResult = await instance.acquireTokenSilent({
-        ...loginRequest,
-        account: loginResponse.account!,
-      });
-      const msAccessToken = msalResult.accessToken;
-      // Send to backend
-      await microsoftAuth(msAccessToken);
-      // Verify backend session
-      const ok = await isAuthenticated();
-      if (ok) {
-        setLoggedIn(true);
-        setAuthChecked(true);
-        navigate("/dashboard");
-      } else {
-        setError("Unable to verify login.");
-      }
+      // After redirect, control will not return here
     } catch (e) {
-      console.error(e);
+      console.error("loginMicrosoft error", e);
       setError("Microsoft sign-in failed.");
-    } finally {
       setLoading(false);
     }
   }
@@ -112,7 +95,7 @@ export default function Login() {
       }}
     >
       <h1 style={{ fontSize: "1.5rem", marginBottom: "1rem" }}>
-        Sign in with Google
+        Get Started!!!
       </h1>
 
       {error && (
@@ -154,7 +137,7 @@ export default function Login() {
           </button>
           <button
             onClick={loginMicrosoft}
-            disabled={loading || inProgress !== InteractionStatus.None}
+            disabled={loading}
             style={{
               display: "inline-flex",
               alignItems: "center",
